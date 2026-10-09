@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Online Survey App (React)</title>
+
+  <!-- React + Babel from CDN: no install needed, just open this file -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+    .card {
+      background: #fff;
+      width: 90%;
+      max-width: 560px;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    h1, h2 { margin-top: 0; color: #333; }
+    button {
+      background: #667eea;
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    button:hover:not(:disabled) { background: #5568d3; }
+    button:disabled { background: #bbb; cursor: not-allowed; }
+    .progress { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+    .progress-bar { height: 100%; background: #667eea; transition: width 0.3s; }
+    .counter { color: #777; font-size: 14px; }
+    .option {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: #f3f4f6;
+      color: #333;
+      border: 2px solid transparent;
+      margin-top: 10px;
+    }
+    .option:hover:not(:disabled) { background: #e5e7eb; }
+    .option.selected { border-color: #667eea; background: #eef0ff; }
+    .summary { padding-left: 20px; line-height: 1.7; }
+    .summary li { margin-bottom: 8px; }
+    .answer { color: #667eea; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // ---------- 1. QUESTION BANK (12 questions, only 5 are asked) ----------
+    const questionBank = [
+      { q: "Which programming language do you use most?", options: ["Python", "Java", "JavaScript", "C / C++"] },
+      { q: "How many hours do you study daily?", options: ["Less than 1", "1 - 2", "3 - 4", "More than 4"] },
+      { q: "Which device do you mostly use for studying?", options: ["Laptop", "Mobile", "Tablet", "Desktop PC"] },
+      { q: "What is your preferred way of learning?", options: ["Videos", "Reading books", "Practising projects", "Classroom lectures"] },
+      { q: "Which domain interests you the most?", options: ["Web Development", "AI / ML", "Cyber Security", "Mobile Apps"] },
+      { q: "How often do you use GitHub?", options: ["Daily", "Weekly", "Rarely", "Never"] },
+      { q: "Which code editor do you prefer?", options: ["VS Code", "PyCharm", "IntelliJ IDEA", "Notepad++"] },
+      { q: "How do you rate your internet connection?", options: ["Excellent", "Good", "Average", "Poor"] },
+      { q: "Which learning platform do you use most?", options: ["YouTube", "Coursera", "Udemy", "College LMS"] },
+      { q: "What do you want to become after graduation?", options: ["Software Developer", "Data Scientist", "Entrepreneur", "Higher Studies"] },
+      { q: "How do you prefer to work on projects?", options: ["Alone", "With a partner", "Small team", "Large team"] },
+      { q: "How would you rate this survey app?", options: ["Excellent", "Good", "Okay", "Needs improvement"] },
+    ];
+
+    const QUESTIONS_PER_SURVEY = 5;
+
+    // ---------- 2. RANDOM PICK (Fisher-Yates shuffle, take first 5) ----------
+    function pickRandomQuestions(bank, count) {
+      const copy = [...bank];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy.slice(0, count);
+    }
+
+    // ---------- 3. REACT COMPONENT ----------
+    function App() {
+      const [screen, setScreen] = useState("start"); // start | question | result
+      const [questions, setQuestions] = useState([]);
+      const [index, setIndex] = useState(0);
+      const [selected, setSelected] = useState(null);
+      const [answers, setAnswers] = useState([]);
+      const [totalSaved, setTotalSaved] = useState(0);
+
+      function startSurvey() {
+        setQuestions(pickRandomQuestions(questionBank, QUESTIONS_PER_SURVEY));
+        setIndex(0);
+        setSelected(null);
+        setAnswers([]);
+        setScreen("question");
+      }
+
+      function handleNext() {
+        const newAnswers = [...answers, { question: questions[index].q, answer: selected }];
+        setAnswers(newAnswers);
+        setSelected(null);
+
+        if (index + 1 < QUESTIONS_PER_SURVEY) {
+          setIndex(index + 1);
+        } else {
+          finishSurvey(newAnswers);
+        }
+      }
+
+      function finishSurvey(finalAnswers) {
+        let count = 1;
+        try {
+          const saved = JSON.parse(localStorage.getItem("surveyResponses") || "[]");
+          saved.push({ time: new Date().toISOString(), answers: finalAnswers });
+          localStorage.setItem("surveyResponses", JSON.stringify(saved));
+          count = saved.length;
+        } catch (e) {
+          // storage blocked: survey still works
+        }
+        setTotalSaved(count);
+        setScreen("result");
+      }
+
+      return (
+        <main className="card">
+          {screen === "start" && (
+            <section>
+              <h1>📋 Online Survey</h1>
+              <p>
+                You will get <strong>5 random questions</strong> from our question bank.
+                Pick one answer for each.
+              </p>
+              <button onClick={startSurvey}>Start Survey</button>
+            </section>
+          )}
+
+          {screen === "question" && (
+            <section>
+              <div className="progress">
+                <div
+                  className="progress-bar"
+                  style={{ width: `${(index / QUESTIONS_PER_SURVEY) * 100}%` }}
+                />
+              </div>
+              <p className="counter">Question {index + 1} of {QUESTIONS_PER_SURVEY}</p>
+              <h2>{questions[index].q}</h2>
+
+              {questions[index].options.map((opt) => (
+                <button
+                  key={opt}
+                  className={"option " + (selected === opt ? "selected" : "")}
+                  onClick={() => setSelected(opt)}
+                >
+                  {opt}
+                </button>
+              ))}
+
+              <button disabled={selected === null} onClick={handleNext}>
+                {index === QUESTIONS_PER_SURVEY - 1 ? "Submit" : "Next"}
+              </button>
+            </section>
+          )}
+
+          {screen === "result" && (
+            <section>
+              <h2>✅ Thank you for completing the survey!</h2>
+              <p>Here are your responses:</p>
+              <ul className="summary">
+                {answers.map((a) => (
+                  <li key={a.question}>
+                    {a.question}
+                    <br />
+                    <span className="answer">→ {a.answer}</span>
+                  </li>
+                ))}
+              </ul>
+              <p>Total surveys submitted on this browser: {totalSaved}</p>
+              <button onClick={startSurvey}>Take Again (new random questions)</button>
+            </section>
+          )}
+        </main>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
